@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <title>ZORAAAA Token Airdrop</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+
   <style>
     body {
       background: linear-gradient(to right, #00c6ff, #0072ff);
@@ -51,7 +53,7 @@
   <div id="walletAddress">Wallet not connected</div>
 
   <div class="button-group">
-    <button id="connectWalletBtn">Connect Wallet</button>
+    <button id="connectWalletBtn">Connect Wallet (MetaMask)</button>
   </div>
 
   <div class="button-group">
@@ -62,54 +64,47 @@
   </div>
 
   <script>
-    let account;
-    const contractAddress = "0x36db3db70879ae95a46fccff8e032fb6dc875c25";
+    const contractAddress = "0x36db3db70879ae95a46fccff8e032fb6dc875c25"; // Your deployed contract
+    let provider;
+    let signer;
+    let userAddress;
 
     async function connectWallet() {
       if (window.ethereum) {
-        try {
-          const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-          account = accounts[0];
-          document.getElementById('walletAddress').innerText = 'Connected: ' + account;
-          document.getElementById('claimFreeBtn').disabled = false;
-          document.getElementById('claimPremiumBtn').disabled = false;
-          alert('Wallet Connected Successfully!');
-        } catch (error) {
-          alert('Wallet Connection Failed!');
-        }
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        signer = provider.getSigner();
+        userAddress = await signer.getAddress();
+        document.getElementById('walletAddress').innerText = "Connected: " + userAddress.slice(0,6) + "..." + userAddress.slice(-4);
+        document.getElementById('claimFreeBtn').disabled = false;
+        document.getElementById('claimPremiumBtn').disabled = false;
+        alert('Wallet Connected Successfully!');
       } else {
         alert('MetaMask not detected!');
       }
     }
 
-    async function claimTokens(amount) {
-      if (!account) {
-        alert('Please connect your wallet first!');
+    async function claimTokens(value) {
+      if (!signer) {
+        alert("Please connect your wallet first!");
         return;
       }
-
-      const transactionParameters = {
-        to: contractAddress,
-        from: account,
-        value: amount,
-      };
-
       try {
-        const txHash = await window.ethereum.request({
-          method: 'eth_sendTransaction',
-          params: [transactionParameters],
+        const tx = await signer.sendTransaction({
+          to: contractAddress,
+          value: ethers.BigNumber.from(value)
         });
-        alert('Transaction sent!\nTX Hash:\n' + txHash);
-        window.open(`https://basescan.org/tx/${txHash}`, '_blank');
+        alert("Transaction sent!\nTX Hash: " + tx.hash);
+        window.open(`https://basescan.org/tx/${tx.hash}`, "_blank");
       } catch (error) {
         console.error(error);
-        alert('Transaction failed!');
+        alert("Transaction failed!");
       }
     }
 
     document.getElementById('connectWalletBtn').addEventListener('click', connectWallet);
     document.getElementById('claimFreeBtn').addEventListener('click', () => claimTokens('0'));
-    document.getElementById('claimPremiumBtn').addEventListener('click', () => claimTokens('100000000000000'));
+    document.getElementById('claimPremiumBtn').addEventListener('click', () => claimTokens('100000000000000')); // Exactly 0.0001 ETH
   </script>
 
 </body>
