@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ZORAAAA Leaderboard</title>
+  <style>
+    body {
+      background: linear-gradient(to right, #0072ff, #00c6ff);
+      font-family: 'Arial', sans-serif;
+      color: white;
+      text-align: center;
+      margin: 0;
+      padding-top: 50px;
+    }
+
+    h1 {
+      font-size: 36px;
+    }
+
+    table {
+      width: 90%;
+      margin: 20px auto;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 12px;
+      background-color: rgba(255, 255, 255, 0.1);
+      border: 1px solid white;
+      font-size: 16px;
+    }
+
+    th {
+      background-color: rgba(255, 255, 255, 0.2);
+    }
+
+    a {
+      color: white;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>ZORAAAA Token Leaderboard</h1>
+
+  <div id="analytics">
+    Loading analytics...
+  </div>
+
+  <table id="leaderboard">
+    <thead>
+      <tr>
+        <th>Rank</th>
+        <th>Wallet Address</th>
+        <th>Claims</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Entries will be inserted dynamically -->
+    </tbody>
+  </table>
+
+  <button onclick="window.location.href='index.html'" style="margin-top: 20px; padding: 10px 20px; font-size: 16px;">Back to Claim Page</button>
+
+  <script>
+    const contractAddress = "0x36db3db70879ae95a46fccff8e032fb6dc875c25";
+    const apiKey = "TD99MHBC8HVM5EP37YECMWJ37XG58MZJQ5";
+
+    async function fetchLeaderboard() {
+      const url = `https://api.basescan.org/api?module=account&action=txlist&address=${contractAddress}&startblock=0&endblock=99999999&sort=asc&apikey=${apiKey}`;
+
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.status !== "1") {
+          document.getElementById('analytics').innerText = "Error fetching data!";
+          return;
+        }
+
+        const transactions = data.result;
+        const claims = {};
+
+        let totalETH = 0;
+
+        transactions.forEach(tx => {
+          if (tx.to.toLowerCase() === contractAddress.toLowerCase()) {
+            if (!claims[tx.from]) {
+              claims[tx.from] = 0;
+            }
+            claims[tx.from]++;
+            totalETH += Number(tx.value);
+          }
+        });
+
+        const claimers = Object.keys(claims)
+          .map(address => ({ address, claims: claims[address] }))
+          .sort((a, b) => b.claims - a.claims);
+
+        // Analytics
+        const totalClaims = transactions.length;
+        const uniqueClaimers = Object.keys(claims).length;
+        const totalETHCollected = totalETH / 1e18;
+        const totalTokensClaimed = uniqueClaimers * 10000; // 10,000 tokens per claim
+
+        document.getElementById('analytics').innerHTML = `
+          <p><strong>Total Claims:</strong> ${totalClaims}</p>
+          <p><strong>Unique Claimers:</strong> ${uniqueClaimers}</p>
+          <p><strong>Total ETH Collected:</strong> ${totalETHCollected.toFixed(5)} ETH</p>
+          <p><strong>Total Tokens Claimed:</strong> ${totalTokensClaimed} ZORAAAA</p>
+        `;
+
+        const tbody = document.querySelector('#leaderboard tbody');
+        tbody.innerHTML = "";
+
+        claimers.forEach((claimer, index) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${index + 1}</td>
+            <td><a href="https://basescan.org/address/${claimer.address}" target="_blank">${claimer.address.slice(0,6)}...${claimer.address.slice(-4)}</a></td>
+            <td>${claimer.claims}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+      } catch (error) {
+        console.error(error);
+        document.getElementById('analytics').innerText = "Error loading leaderboard!";
+      }
+    }
+
+    fetchLeaderboard();
+  </script>
+
+</body>
+</html>
