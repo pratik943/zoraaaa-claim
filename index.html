@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ZORAAAA Token Airdrop</title>
+  <style>
+    body {
+      background: linear-gradient(to right, #00c6ff, #0072ff);
+      font-family: 'Arial', sans-serif;
+      color: white;
+      text-align: center;
+      padding-top: 80px;
+      margin: 0;
+      height: 100vh;
+    }
+
+    h1 {
+      font-size: 36px;
+    }
+
+    #walletAddress {
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    button {
+      background: white;
+      color: #0072ff;
+      border: none;
+      padding: 15px 30px;
+      margin: 10px;
+      font-size: 18px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    button:hover {
+      background: #e0e0e0;
+    }
+
+    .button-group {
+      margin-top: 30px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>Claim Your 10,000 ZORAAAA Tokens!</h1>
+  <div id="walletAddress">Wallet not connected</div>
+
+  <div class="button-group">
+    <button id="connectWalletBtn">Connect Wallet</button>
+  </div>
+
+  <div class="button-group">
+    <button id="claimFreeBtn" disabled>Claim Free (0 ETH)</button>
+    <button id="claimPremiumBtn" disabled>Claim Premium (0.0001 ETH)</button>
+    <br>
+    <button onclick="window.location.href='leaderboard.html'">View Leaderboard</button>
+  </div>
+
+  <script>
+    let account;
+    const contractAddress = "0x36db3db70879ae95a46fccff8e032fb6dc875c25";
+
+    async function connectWallet() {
+      if (window.ethereum) {
+        try {
+          const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+          account = accounts[0];
+          document.getElementById('walletAddress').innerText = 'Connected: ' + account;
+          document.getElementById('claimFreeBtn').disabled = false;
+          document.getElementById('claimPremiumBtn').disabled = false;
+          alert('Wallet Connected Successfully!');
+        } catch (error) {
+          alert('Wallet Connection Failed!');
+        }
+      } else {
+        alert('MetaMask not detected!');
+      }
+    }
+
+    async function claimTokens(amount) {
+      if (!account) {
+        alert('Please connect your wallet first!');
+        return;
+      }
+
+      const transactionParameters = {
+        to: contractAddress,
+        from: account,
+        value: amount,
+      };
+
+      try {
+        const txHash = await window.ethereum.request({
+          method: 'eth_sendTransaction',
+          params: [transactionParameters],
+        });
+        alert('Transaction sent!\nTX Hash:\n' + txHash);
+        window.open(`https://basescan.org/tx/${txHash}`, '_blank');
+      } catch (error) {
+        console.error(error);
+        alert('Transaction failed!');
+      }
+    }
+
+    document.getElementById('connectWalletBtn').addEventListener('click', connectWallet);
+    document.getElementById('claimFreeBtn').addEventListener('click', () => claimTokens('0'));
+    document.getElementById('claimPremiumBtn').addEventListener('click', () => claimTokens('100000000000000'));
+  </script>
+
+</body>
+</html>
