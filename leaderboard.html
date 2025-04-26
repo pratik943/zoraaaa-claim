@@ -4,145 +4,128 @@
   <meta charset="UTF-8">
   <title>ZORAAAA Leaderboard</title>
   <style>
-    /* Global Styles */
     body {
-      margin: 0;
+      background: linear-gradient(to right, #00c6ff, #0072ff);
       font-family: 'Arial', sans-serif;
-      background: linear-gradient(135deg, #0072ff, #8000ff);
-      color: #ffffff;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      color: white;
+      text-align: center;
+      margin: 0;
       padding: 20px;
     }
+
     h1 {
-      margin-top: 20px;
-      font-size: 36px;
-      text-align: center;
+      font-size: 40px;
+      margin-bottom: 10px;
     }
-    /* Analytics Section */
+
     #analytics {
-      width: 100%;
-      max-width: 800px;
       margin: 20px auto;
-      text-align: center;
-      padding: 15px;
+      font-size: 20px;
+    }
+
+    .card {
       background: rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
-      font-size: 18px;
+      border-radius: 10px;
+      padding: 15px;
+      margin: 10px auto;
+      width: 90%;
+      max-width: 500px;
+      text-align: left;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }
-    #analytics p {
-      margin: 5px 0;
-    }
-    /* Leaderboard Table Styles */
-    .leaderboard-container {
-      width: 100%;
-      max-width: 800px;
-      margin: 0 auto 20px auto;
-    }
-    .leaderboard-entry {
-      background: rgba(255, 255, 255, 0.15);
-      border-radius: 8px;
-      padding: 10px;
-      margin: 8px 0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .leaderboard-entry span {
-      font-size: 16px;
-      word-break: break-all;
-    }
-    .rank, .claims {
-      width: 80px;
-      text-align: center;
-    }
-    .address {
-      flex: 1;
-      padding: 0 10px;
-      font-family: monospace;
-      text-overflow: ellipsis;
-      overflow: hidden;
-      white-space: nowrap;
-    }
-    /* Medal icons */
+
     .medal {
       font-size: 24px;
+      margin-right: 10px;
     }
-    /* Button to return */
+
+    .wallet {
+      font-weight: bold;
+    }
+
+    .claims {
+      float: right;
+      font-size: 18px;
+    }
+
+    a {
+      color: white;
+      text-decoration: none;
+    }
+
     .back-btn {
-      background: #ffffff;
+      background: white;
       color: #0072ff;
       border: none;
-      padding: 10px 20px;
-      border-radius: 8px;
-      font-size: 16px;
-      cursor: pointer;
-      transition: background 0.3s;
+      padding: 12px 24px;
+      font-size: 18px;
       margin-top: 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: 0.3s;
     }
+
     .back-btn:hover {
       background: #e0e0e0;
     }
   </style>
 </head>
+
 <body>
 
   <h1>ZORAAAA Leaderboard</h1>
-  
-  <!-- Analytics Section -->
-  <div id="analytics">
-    Loading analytics...
-  </div>
 
-  <!-- Leaderboard Container -->
-  <div class="leaderboard-container" id="leaderboard">
-    <!-- Leaderboard entries inserted dynamically -->
-  </div>
+  <div id="analytics">Loading analytics...</div>
+
+  <div id="leaderboard"></div>
 
   <button class="back-btn" onclick="window.location.href='index.html'">Back to Claim Page</button>
 
   <script>
     const contractAddress = "0x36db3db70879ae95a46fccff8e032fb6dc875c25";
     const apiKey = "TD99MHBC8HVM5EP37YECMWJ37XG58MZJQ5";
-    const baseScanAPI = "https://api.basescan.org/api";
-    
-    // Settings for pagination:
-    // We'll fetch in batches of 1000 transactions until fewer than 1000 are returned
-    const offset = 1000;
-    
+
+    async function fetchTransactionsInRange(startBlock, endBlock) {
+      const url = `https://api.basescan.org/api?module=account&action=txlist&address=${contractAddress}&startblock=${startBlock}&endblock=${endBlock}&sort=asc&apikey=${apiKey}`;
+      const response = await fetch(url);
+      const data = await response.json();
+      if (data.status === "1") {
+        return data.result;
+      } else {
+        return [];
+      }
+    }
+
     async function fetchAllTransactions() {
       let allTxs = [];
-      let page = 1;
-      let fetched = [];
-      try {
-        do {
-          // Build URL with pagination
-          const url = `${baseScanAPI}?module=account&action=txlist&address=${contractAddress}&startblock=0&endblock=99999999&page=${page}&offset=${offset}&sort=asc&apikey=${apiKey}`;
-          const response = await fetch(url);
-          const data = await response.json();
-          if (data.status !== "1") {
-            console.error("API Error:", data.message);
-            break;
+      const blockStep = 50000;
+      let currentStartBlock = 0;
+      let maxBlock = 99999999;
+      let done = false;
+
+      while (!done) {
+        const currentEndBlock = currentStartBlock + blockStep;
+        const transactions = await fetchTransactionsInRange(currentStartBlock, currentEndBlock);
+        if (transactions.length === 0) {
+          done = true;
+        } else {
+          allTxs = allTxs.concat(transactions);
+          currentStartBlock = currentEndBlock + 1;
+          if (currentStartBlock > maxBlock) {
+            done = true;
           }
-          fetched = data.result;
-          allTxs = allTxs.concat(fetched);
-          page++;
-        } while (fetched.length === offset);
-      } catch (error) {
-        console.error("Failed to fetch transactions", error);
+        }
       }
       return allTxs;
     }
-    
-    function processTransactions(transactions) {
+
+    async function loadLeaderboard() {
+      const transactions = await fetchAllTransactions();
       const claims = {};
       let totalETH = 0;
-      // Process transactions, counting claims per sender
+
       transactions.forEach(tx => {
-        // Ensure case insensitive match
         if (tx.to.toLowerCase() === contractAddress.toLowerCase()) {
-          // Count claims per wallet
           if (!claims[tx.from]) {
             claims[tx.from] = 0;
           }
@@ -150,64 +133,41 @@
           totalETH += Number(tx.value);
         }
       });
-      return { claims, totalETH };
-    }
-    
-    function updateAnalytics(totalTx, claimsObj, totalETH) {
-      const uniqueClaimers = Object.keys(claimsObj).length;
-      // Calculated tokens claimed: each claim = 10,000 tokens
-      const totalTokens = totalTx * 10000;
+
+      const claimers = Object.keys(claims)
+        .map(address => ({ address, claims: claims[address] }))
+        .sort((a, b) => b.claims - a.claims);
+
+      const totalClaims = transactions.length;
+      const uniqueClaimers = Object.keys(claims).length;
+      const totalETHCollected = totalETH / 1e18;
+      const totalTokensClaimed = totalClaims * 10000; // 10,000 tokens per claim
+
       document.getElementById('analytics').innerHTML = `
-        <p>🔥 Total Claims: ${totalTx}</p>
-        <p>👥 Unique Claimers: ${uniqueClaimers}</p>
-        <p>⛽ ETH Collected: ${(totalETH / 1e18).toFixed(5)} ETH</p>
-        <p>💎 Tokens Claimed: ${totalTokens.toLocaleString()} ZORAAAA</p>
+        🔥 <strong>Total Claims:</strong> ${totalClaims}<br>
+        👥 <strong>Unique Claimers:</strong> ${uniqueClaimers}<br>
+        ⛽ <strong>Total ETH Collected:</strong> ${totalETHCollected.toFixed(4)} ETH<br>
+        💎 <strong>Total Tokens Claimed:</strong> ${totalTokensClaimed.toLocaleString()} ZORAAAA
       `;
-    }
-    
-    function createLeaderboardEntries(claimsObj) {
-      // Convert claimsObj into an array and sort descending by number of claims
-      const arr = Object.keys(claimsObj).map(address => ({
-        address,
-        claims: claimsObj[address]
-      }));
-      arr.sort((a, b) => b.claims - a.claims);
-      return arr;
-    }
-    
-    function renderLeaderboard(entries) {
-      const container = document.getElementById('leaderboard');
-      container.innerHTML = "";
-      entries.forEach((entry, index) => {
-        // Determine medal for top 3
-        let medal = "";
-        if (index === 0) medal = "🥇";
-        else if (index === 1) medal = "🥈";
-        else if (index === 2) medal = "🥉";
-        else medal = "🏅";
-        
-        // Create leaderboard card (div)
+
+      const leaderboard = document.getElementById('leaderboard');
+      leaderboard.innerHTML = "";
+
+      claimers.forEach((claimer, index) => {
+        const medal = index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "🏅";
         const div = document.createElement('div');
-        div.className = "leaderboard-entry";
+        div.className = 'card';
         div.innerHTML = `
-          <div class="rank">${medal}</div>
-          <div class="address">${entry.address.slice(0, 6)}...${entry.address.slice(-4)}</div>
-          <div class="claims">${entry.claims}</div>
+          <span class="medal">${medal}</span> 
+          <a class="wallet" href="https://basescan.org/address/${claimer.address}" target="_blank">
+            ${claimer.address.slice(0, 6)}...${claimer.address.slice(-4)}
+          </a>
+          <span class="claims">${claimer.claims} Claims</span>
         `;
-        container.appendChild(div);
+        leaderboard.appendChild(div);
       });
     }
-    
-    async function loadLeaderboard() {
-      const transactions = await fetchAllTransactions();
-      const { claims, totalETH } = processTransactions(transactions);
-      const totalTx = transactions.filter(tx => tx.to.toLowerCase() === contractAddress.toLowerCase()).length;
-      updateAnalytics(totalTx, claims, totalETH);
-      const leaderboardEntries = createLeaderboardEntries(claims);
-      renderLeaderboard(leaderboardEntries);
-    }
-    
-    // Initiate leaderboard loading
+
     loadLeaderboard();
   </script>
 
