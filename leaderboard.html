@@ -18,6 +18,11 @@
       margin-bottom: 10px;
     }
 
+    #latest {
+      margin: 20px auto;
+      font-size: 20px;
+    }
+
     #analytics {
       margin: 20px auto;
       font-size: 20px;
@@ -75,9 +80,9 @@
 
   <h1>ZORAAAA Leaderboard</h1>
 
+  <div id="latest">Loading latest claimer...</div>
   <div id="analytics">Loading analytics...</div>
-
-  <div id="leaderboard"></div>
+  <div id="leaderboard">Loading leaderboard...</div>
 
   <button class="back-btn" onclick="window.location.href='index.html'">Back to Claim Page</button>
 
@@ -85,8 +90,8 @@
     const contractAddress = "0x36db3db70879ae95a46fccff8e032fb6dc875c25";
     const apiKey = "TD99MHBC8HVM5EP37YECMWJ37XG58MZJQ5";
 
-    async function fetchTransactionsInRange(startBlock, endBlock) {
-      const url = `https://api.basescan.org/api?module=account&action=txlist&address=${contractAddress}&startblock=${startBlock}&endblock=${endBlock}&sort=asc&apikey=${apiKey}`;
+    async function fetchLatestTransactions() {
+      const url = `https://api.basescan.org/api?module=account&action=txlist&address=${contractAddress}&startblock=4000000&endblock=99999999&sort=desc&apikey=${apiKey}&offset=1000&page=1`;
       const response = await fetch(url);
       const data = await response.json();
       if (data.status === "1") {
@@ -96,31 +101,8 @@
       }
     }
 
-    async function fetchAllTransactions() {
-      let allTxs = [];
-      const blockStep = 50000;
-      let currentStartBlock = 4000000;  // Updated block start for BaseChain
-      let maxBlock = 99999999;
-      let done = false;
-
-      while (!done) {
-        const currentEndBlock = currentStartBlock + blockStep;
-        const transactions = await fetchTransactionsInRange(currentStartBlock, currentEndBlock);
-        if (transactions.length === 0) {
-          done = true;
-        } else {
-          allTxs = allTxs.concat(transactions);
-          currentStartBlock = currentEndBlock + 1;
-          if (currentStartBlock > maxBlock) {
-            done = true;
-          }
-        }
-      }
-      return allTxs;
-    }
-
     async function loadLeaderboard() {
-      const transactions = await fetchAllTransactions();
+      const transactions = await fetchLatestTransactions();
       const claims = {};
       let totalETH = 0;
 
@@ -136,18 +118,29 @@
 
       const claimers = Object.keys(claims)
         .map(address => ({ address, claims: claims[address] }))
-        .sort((a, b) => b.claims - a.claims);
+        .sort((a, b) => b.claims - a.claims)
+        .slice(0, 100); // Only Top 100
 
       const totalClaims = transactions.length;
       const uniqueClaimers = Object.keys(claims).length;
       const totalETHCollected = totalETH / 1e18;
       const totalTokensClaimed = totalClaims * 10000; // 10,000 tokens per claim
 
+      // Show Latest Claimer
+      const latestClaim = transactions.find(tx => tx.to.toLowerCase() === contractAddress.toLowerCase());
+      if (latestClaim) {
+        document.getElementById('latest').innerHTML = `
+          ⚡ <strong>Latest Claimer:</strong> <a href="https://basescan.org/address/${latestClaim.from}" target="_blank">
+          ${latestClaim.from.slice(0,6)}...${latestClaim.from.slice(-4)}
+          </a> @ Block ${latestClaim.blockNumber}
+        `;
+      }
+
       document.getElementById('analytics').innerHTML = `
-        🔥 <strong>Total Claims:</strong> ${totalClaims}<br>
+        🔥 <strong>Total Claims Checked:</strong> ${totalClaims}<br>
         👥 <strong>Unique Claimers:</strong> ${uniqueClaimers}<br>
-        ⛽ <strong>Total ETH Collected:</strong> ${totalETHCollected.toFixed(4)} ETH<br>
-        💎 <strong>Total Tokens Claimed:</strong> ${totalTokensClaimed.toLocaleString()} ZORAAAA
+        ⛽ <strong>ETH Collected (Checked Txns):</strong> ${totalETHCollected.toFixed(4)} ETH<br>
+        💎 <strong>Tokens Claimed (Checked):</strong> ${totalTokensClaimed.toLocaleString()} ZORAAAA
       `;
 
       const leaderboard = document.getElementById('leaderboard');
@@ -168,7 +161,11 @@
       });
     }
 
+    // First load immediately
     loadLeaderboard();
+
+    // Auto refresh every 15 seconds
+    setInterval(loadLeaderboard, 15000);
   </script>
 
 </body>
